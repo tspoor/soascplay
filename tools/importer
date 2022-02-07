@@ -1,0 +1,69 @@
+#!/usr/bin/python3.10
+
+# CREATE TABLE files (id INTEGER PRIMARY KEY, category TEXT NOT NULL, hvsc TEXT NOT NULL, filename TEXT NOT NULL, composer TEXT NOT NULL);
+
+import sqlite3
+import re, sys
+
+thislist = []
+index = 1
+
+try:
+  con = sqlite3.connect('soasc.db')
+  cur = con.cursor()
+except:
+  print("An exception occurred") 
+
+try:
+  with open("soascfiles.txt", "r") as f:
+    for line in f:
+      m = re.match(r"^hvsc/.*?/.*?/(.*?)/.*$", line)
+      if not m:
+        print("We've reached the end.")
+      cat = m.group(1)
+      if not cat:
+        print("Problem found.", m.group(0))
+        sys.exit(1)
+
+      if cat.upper() == "MUSICIANS":
+          # /049/FLAC/MUSICIANS/T/The_Blue_Ninja/Final_Day_Music_2_T001.sid_CSG8580R5.flac
+          #m = re.match(r"^hvsc/(\d{3})/.*?/.*?/[-0-9A-Z]+/(.*?)/(.*?)$", line)
+          m = re.match(r"^hvsc/(\d{3})/.*?/.*?/[-0-9A-Z]+/(.*?)/.*$", line)
+          if m:
+            hvsc     = m.group(1)
+            category = cat
+            composer = m.group(2)
+          m = re.match(r"^.*?/%s/(.*?)$" % composer, line)
+          if m:
+            filename = m.group(1)
+            
+      elif cat.upper() in [ "DEMOS", "GAMES" ]:
+          m = re.match(r"^hvsc/(\d{3})/.*?/(DEMOS|GAMES)/.*/(.*?)$", line)
+          if m:
+            hvsc     = m.group(1)
+            category = cat
+            composer = "N/A"
+            filename = m.group(3)
+
+      #print("index", index, "cat:",category,"hvsc:",hvsc,"composer:",composer,"filename:",filename)
+      thislist.append((index,category,hvsc,composer,filename))
+      index+=1
+      
+except Exception as e:
+  exception_type, exception_object, exception_traceback = sys.exc_info()
+  filename = exception_traceback.tb_frame.f_code.co_filename
+  line_number = exception_traceback.tb_lineno
+  print("Exception type: ", exception_type)
+  print("File name: ", filename)
+  print("Line number: ", line_number)
+  sys.exit(1)
+
+finally:
+  f.close()
+
+try:
+  print("Inserting data in database.")
+  cur.executemany("INSERT INTO files (id, category, hvsc, composer, filename) VALUES (?, ?, ?, ?, ?)", thislist)
+  con.commit()
+finally:
+  con.close()

@@ -1,0 +1,188 @@
+#!/usr/bin/python3
+
+""" 
+SOASCPlay plays mp3 or flac files from SOASC
+Copyright (C) 2022 Toshio Spoor
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+"""
+
+import sys, getopt, os, re, sqlite3, subprocess, configparser
+from struct import *
+from collections import namedtuple
+
+PSID_SIDMODEL_UNKNOWN = 0
+PSID_SIDMODEL_6581    = 1
+PSID_SIDMODEL_8580    = 2
+PSID_SIDMODEL_ANY     = PSID_SIDMODEL_6581 | PSID_SIDMODEL_8580
+
+PSID_ID = 0x50534944
+RSID_ID = 0x52534944
+
+DEBUG = True
+
+def init():
+    global mirror_root, releasePreference, sidModels, sqlitedb, con, cur
+    config = configparser.ConfigParser()
+    config.read(os.path.dirname(__file__)+'/'+'soascplay.ini')
+    mirror_root = config['DEFAULT']['Mirror']
+    releasePreference = config['DEFAULT']['Release']
+    sidModels = ("MOS6581" + releasePreference, "CSG8580R5", "MOS6581" + releasePreference)
+    sqlitedb = config['DEFAULT']['SoascDB']
+    
+    con = sqlite3.connect(sqlitedb)
+
+    if DEBUG:
+        con.set_trace_callback(print)
+
+    cur = con.cursor()
+
+def opendb():
+    global con, cur, sqlitedb
+    con = sqlite3.connect(sqlitedb)
+    if DEBUG:
+        con.set_trace_callback(print)
+    cur = con.cursor()
+
+def readHeader(fileName):
+    global psid
+    fp = open(fileName, "rb")
+    data = fp.read(124)
+    fp.close()
+    psidHeader = namedtuple('psidHeader', 'id version data load init play songs start speed name author released flags relocStartPage relocPages sidChipBase2 sidChipBase3')
+    psid = psidHeader._make(unpack('>IHHHHHHHI32s32s32sHBBBB', data))
+
+    if (psid.id == PSID_ID) or (psid.id == RSID_ID):
+        if psid.version >= 2:
+            return psid
+        else:
+            return None
+
+def sidModel(modelFlag):
+
+    modelFlag = modelFlag >> 4
+
+    if ((modelFlag & PSID_SIDMODEL_ANY) == PSID_SIDMODEL_ANY):
+        return PSID_SIDMODEL_ANY
+
+    if (modelFlag & PSID_SIDMODEL_6581):
+        return PSID_SIDMODEL_6581
+
+    if (modelFlag & PSID_SIDMODEL_8580):
+        return PSID_SIDMODEL_8580
+
+    return PSID_SIDMODEL_UNKNOWN
+
+def usage():
+    print ('soascplay [-l] [file.sid file2.sid file3.sid]')
+
+def genURL(fileName):
+
+    encoding='/FLAC/'
+
+    m = re.match(r'^.*/(MUSICIANS|DEMOS|GAMES)/[-0-9A-Z]+?/(.*)$', os.getcwd())
+    if m:
+        category = m.group(1)
+        composer = m.group(2)
+        m = re.match(r'^(.*?)/(.*?)$', composer)
+        if m:
+            composer = m.group(1)
+
+    else:
+        print("Trouble determining path.")
+        return None
+
+    m = re.match(r'^.*/(MUSICIANS|DEMOS|GAMES)/(.*)$', os.getcwd())
+
+    if m:
+        sidpath = m.group(2)
+    else:
+        print("Trouble determining path.")
+        return None
+
+    sidType = sidModels[sidWrap(fileName)-1]
+    stripped = os.path.splitext(fileName)[0]
+    defaultSong = str(psid.start)
+    fileName = stripped + '_T'+ defaultSong.zfill(3) + '.sid_' + sidType + '.flac'
+    result = cur.execute('SELECT hvsc, filename FROM files WHERE (filename like "%' + fileName + '" and composer="' + composer + '") ORDER BY id DESC LIMIT 1').fetchone()
+
+    if not result:
+        print("Sorry no flac found trying mp3.")
+        encoding = '/MP3/'
+        fileName = stripped + '_T'+ defaultSong.zfill(3) + '.sid_' + sidType + '.mp3'
+        result = cur.execute('SELECT hvsc, filename FROM files WHERE (filename like "%' + fileName + '" and composer="' + composer + '") ORDER BY id DESC LIMIT 1').fetchone()
+        if not result:
+            return None
+
+    hvsc = result[0]
+    fileName = os.path.basename(result[1])
+
+    url = mirror_root + '/' + hvsc + encoding + category + '/' + sidpath + '/' + fileName
+
+    if DEBUG:
+        print(url)
+
+    return(url)
+
+def execute(fileName):
+
+    try:
+        subprocess.run(["mpv", "--loop", "--length=-1", "--cache=yes", genURL(fileName)], check=True)
+    except subprocess.CalledProcessError as e:
+        print('Could not execute media player:\n', e)
+        return None
+    except KeyboardInterrupt:
+        sys.exit()
+
+def sidWrap(fileName):
+    psid = readHeader(fileName)
+    if psid is None:
+        print("File " + fileName + " not supported.")
+        sys.exit(1)
+    return(sidModel(psid.flags))
+
+def main():
+    loop = False
+
+    print ('SOASCPlay v0.1\n')
+
+    try:
+        opts, args = getopt.getopt(sys.argv[1:],"hl",["help","loop"])
+    except getopt.GetoptError:
+        usage()
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt in ("-h", "--help"):
+            usage()
+            sys.exit()
+        elif opt in ("-l", "--loop"):
+            loop = True
+    if not args:
+        usage()
+        sys.exit(2)
+
+    filelist=args
+
+    for fileName in filelist:
+        execute(fileName)
+
+if __name__ == "__main__":
+    try:
+        init()
+        main()
+    finally:
+        print("Shutting down.")
+        con.close()
+    

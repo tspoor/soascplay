@@ -1,0 +1,4 @@
+[DEFAULT]
+SoascDB = # Path to sqlite db
+Release = R3
+Mirror = # URL to SOASC Mirror
