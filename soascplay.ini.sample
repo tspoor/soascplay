@@ -1,4 +1,4 @@
 [DEFAULT]
 SoascDB = # Path to sqlite db
 Release = R3
-Mirror = # URL to SOASC Mirror
+Mirror = http://chuangtzu.ftp.acc.umu.se/mirror/media/Oakvalley/soasc/hvsc
