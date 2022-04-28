@@ -19,7 +19,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 """
 
-import sys, getopt, os, re, sqlite3, subprocess, configparser
+import sys, getopt, os, re, sqlite3, subprocess, configparser, random
 from struct import *
 from collections import namedtuple
 
@@ -155,11 +155,12 @@ def sidWrap(fileName):
 
 def main():
     loop = False
+    rnd = False
 
     print ('SOASCPlay v0.1\n')
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hl",["help","loop"])
+        opts, args = getopt.getopt(sys.argv[1:],"hlr",["help","loop","random"])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -169,11 +170,16 @@ def main():
             sys.exit()
         elif opt in ("-l", "--loop"):
             loop = True
+        elif opt in ("-r", "--random"):
+            rnd = True
     if not args:
         usage()
         sys.exit(2)
 
     filelist=args
+
+    if random:
+        random.shuffle(filelist)
 
     for fileName in filelist:
         execute(fileName)
