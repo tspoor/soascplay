@@ -178,7 +178,7 @@ def main():
 
     filelist=args
 
-    if random:
+    if rnd:
         random.shuffle(filelist)
 
     for fileName in filelist:
