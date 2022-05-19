@@ -136,10 +136,19 @@ def genURL(fileName):
 
     return(url)
 
-def execute(fileName):
+def execute(fileName, loop):
 
     try:
-        subprocess.run(["mpv", "--loop", "--length=-1", "--cache=yes", genURL(fileName)], check=True)
+        if loop:
+            options='--loop --length=-1'
+        else:
+            options=''
+
+        if options:	
+            subprocess.run(["mpv", options, "--cache=yes", genURL(fileName)], check=True)
+        else:
+            subprocess.run(["mpv", "--cache=yes", genURL(fileName)], check=True)
+		
     except subprocess.CalledProcessError as e:
         print('Could not execute media player:\n', e)
         return None
@@ -182,7 +191,7 @@ def main():
         random.shuffle(filelist)
 
     for fileName in filelist:
-        execute(fileName)
+        execute(fileName, loop)
 
 if __name__ == "__main__":
     try:
