@@ -138,16 +138,20 @@ def genURL(fileName):
 
 def execute(fileName, loop):
 
-    try:
-        if loop:
-            options='--loop --length=-1'
-        else:
-            options=''
+    player = [ 'mpv' ]
+    fileName = [ genURL(fileName) ]
+    args = ""
 
-        if options:	
-            subprocess.run(["mpv", options, "--cache=yes", genURL(fileName)], check=True)
-        else:
-            subprocess.run(["mpv", "--cache=yes", genURL(fileName)], check=True)
+    if loop:
+        args = [ '--loop', '--length=-1' ]
+
+    if args:
+        cmd = player + args + fileName
+    else:
+        cmd = player + fileName
+
+    try:
+        subprocess.run(cmd, check=True)
 		
     except subprocess.CalledProcessError as e:
         print('Could not execute media player:\n', e)
