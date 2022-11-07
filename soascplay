@@ -31,7 +31,8 @@ PSID_SIDMODEL_ANY     = PSID_SIDMODEL_6581 | PSID_SIDMODEL_8580
 PSID_ID = 0x50534944
 RSID_ID = 0x52534944
 
-DEBUG = True
+DEBUG = False
+VERSION = 0.2
 
 def init():
     global mirror_root, releasePreference, sidModels, sqlitedb, con, cur
@@ -116,13 +117,31 @@ def genURL(fileName):
     stripped = os.path.splitext(fileName)[0]
     defaultSong = str(psid.start)
     fileName = stripped + '_T'+ defaultSong.zfill(3) + '.sid_' + sidType + '.flac'
-    result = cur.execute('SELECT hvsc, filename FROM files WHERE (filename like "%' + fileName + '" and composer="' + composer + '") ORDER BY id DESC LIMIT 1').fetchone()
+
+    if category == 'MUSICIANS':
+        m = re.match(r'^[-0-9A-Z]+?/' + composer + '/(.*?)$', sidpath)
+
+        if m:
+            subpath = m.group(1)
+            fileName = subpath + '/' + fileName
+            if DEBUG:
+                print("Path fix")
+                
+
+    result = cur.execute('SELECT hvsc, filename FROM files WHERE (filename like "' + fileName + '" and composer="' + composer + '") ORDER BY id DESC LIMIT 1').fetchone()
 
     if not result:
         print("Sorry no flac found trying mp3.")
         encoding = '/MP3/'
-        fileName = stripped + '_T'+ defaultSong.zfill(3) + '.sid_' + sidType + '.mp3'
-        result = cur.execute('SELECT hvsc, filename FROM files WHERE (filename like "%' + fileName + '" and composer="' + composer + '") ORDER BY id DESC LIMIT 1').fetchone()
+        m = re.match(r'(^.*?)\.flac$', fileName)
+
+        if m:
+            fileName = m.group(1) + '.mp3'
+        else:
+            print("Couldn't decipher.")
+            return None
+
+        result = cur.execute('SELECT hvsc, filename FROM files WHERE (filename like "' + fileName + '" and composer="' + composer + '") ORDER BY id DESC LIMIT 1').fetchone()
         if not result:
             return None
 
@@ -170,7 +189,7 @@ def main():
     loop = False
     rnd = False
 
-    print ('SOASCPlay v0.1\n')
+    print ('SOASCPlay v'+ str(VERSION) + '\n')
 
     try:
         opts, args = getopt.getopt(sys.argv[1:],"hlr",["help","loop","random"])

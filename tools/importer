@@ -1,4 +1,4 @@
-#!/usr/bin/python3.10
+#!/usr/bin/python3
 
 # CREATE TABLE files (id INTEGER PRIMARY KEY, category TEXT NOT NULL, hvsc TEXT NOT NULL, filename TEXT NOT NULL, composer TEXT NOT NULL);
 
@@ -15,7 +15,7 @@ except:
   print("An exception occurred") 
 
 try:
-  with open("soascfiles.txt", "r") as f:
+  with open("soascfiles-77.txt", "r") as f:
     for line in f:
       m = re.match(r"^hvsc/.*?/.*?/(.*?)/.*$", line)
       if not m:
